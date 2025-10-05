@@ -1,113 +1,68 @@
--- Tải Rayfield UI
-local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
+-- LocalScript: InfiniteStamina.lua
+local player = game.Players.LocalPlayer
 
-local autoBlock = false
-local blockRadius = 15 -- phạm vi mặc định, chỉnh qua UI
-local blockKey = Enum.KeyCode.F -- thay đổi nếu phím block khác
+-- Tên giá trị stamina trong game của bạn (có thể là IntValue/NumberValue)
+local STAMINA_NAME = "Stamina"      -- đổi nếu game bạn dùng tên khác
+local MAX_STAMINA = 100             -- đổi theo max thực tế
+local REFILL_RATE = 10              -- số đơn vị / giây (tùy chỉnh)
 
--- Khởi tạo UI với tên Cyan Hub
-local Window = Rayfield:CreateWindow({
-    Name = "Cyan Hub", -- Đổi tên UI tại đây
-    LoadingTitle = "Cyan Hub Loading",
-    LoadingSubtitle = "by cyansigma",
-    ConfigurationSaving = {
-        Enabled = true,
-        FolderName = nil,
-        FileName = "CyanHubUI"
-    },
-    Discord = {
-        Enabled = false,
-        Invite = "",
-        RememberJoins = false
-    },
-    KeySystem = false
-})
+local enabled = true                -- toggle mặc định
 
-local MainTab = Window:CreateTab("Auto", 4483362458)
+-- Helper: lấy stamina value (chờ nếu chưa có)
+local function getStamina()
+    -- thường Stamina để trong Player hoặc trong Character; kiểm tra cả hai
+    local s = player:FindFirstChild(STAMINA_NAME)
+    if s then return s end
 
-MainTab:CreateToggle({
-    Name = "Auto Block",
-    CurrentValue = false,
-    Flag = "AutoBlock",
-    Callback = function(Value)
-        autoBlock = Value
-    end,
-})
-
-MainTab:CreateSlider({
-    Name = "Phạm vi block (studs)",
-    Range = {5, 50},
-    Increment = 1,
-    Suffix = "studs",
-    CurrentValue = blockRadius,
-    Flag = "BlockRadius",
-    Callback = function(Value)
-        blockRadius = Value
-    end,
-})
-
--- Hàm kiểm tra killer tấn công trong phạm vi
-function isKillerAttackingInRadius()
-    local localPlayer = game.Players.LocalPlayer
-    if not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then return false end
-    local myPos = localPlayer.Character.HumanoidRootPart.Position
-    for _,v in pairs(game.Players:GetPlayers()) do
-        if v ~= localPlayer and v.Team and v.Team.Name == "Killer" then
-            local char = v.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                if (char.HumanoidRootPart.Position - myPos).Magnitude <= blockRadius then
-                    if char:FindFirstChild("Attack") and char.Attack.Value == true then
-                        return true
-                    end
-                end
-            end
-        end
+    local character = player.Character
+    if character then
+        s = character:FindFirstChild(STAMINA_NAME)
+        if s then return s end
     end
-    return false
+
+    -- nếu chưa có, chờ Player thêm nó (thử trong 5s)
+    s = player:WaitForChild(STAMINA_NAME, 5) -- nếu hết 5s sẽ lỗi
+    return s
 end
 
--- Tự động block khi killer đánh trong phạm vi blockRadius
-spawn(function()
-    while task.wait(0.05) do
-        if autoBlock then
-            if isKillerAttackingInRadius() then
-                game:GetService("VirtualInputManager"):SendKeyEvent(true, blockKey, false, game)
-                wait(0.2)
-                game:GetService("VirtualInputManager"):SendKeyEvent(false, blockKey, false, game)
-            end
-        end
-    end
+-- An toàn: bắt lỗi trường hợp không tìm thấy
+local ok, stamina = pcall(getStamina)
+if not ok or not stamina then
+    warn("InfiniteStamina: Không tìm thấy giá trị '"..STAMINA_NAME.."'. Tạo 1 NumberValue/IntValue tên đó trong Player hoặc Character.")
+    return
+end
+
+-- GUI toggle đơn giản (không bắt buộc)
+local StarterGui = game:GetService("StarterGui")
+-- Tạo một ScreenGui nhỏ cho toggle (chỉ client)
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "InfiniteStaminaToggle"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(0,140,0,40)
+button.Position = UDim2.new(0,10,0,10)
+button.Text = "Inf Stamina: ON"
+button.Parent = screenGui
+
+button.MouseButton1Click:Connect(function()
+    enabled = not enabled
+    button.Text = "Inf Stamina: " .. (enabled and "ON" or "OFF")
 end)
 
--- PHẦN NÚT ẨN/HIỆN UI (dành cho mobile)
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ToggleRayfieldGui"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = game:GetService("CoreGui")
+-- Vòng lặp refill (an toàn, gọn)
+local runService = game:GetService("RunService")
+local last = tick()
+runService.Heartbeat:Connect(function(dt)
+    if not enabled then return end
 
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Name = "ToggleButton"
-ToggleButton.Size = UDim2.new(0, 100, 0, 40)
-ToggleButton.Position = UDim2.new(1, -120, 1, -60) -- góc phải, dưới màn hình
-ToggleButton.AnchorPoint = Vector2.new(0, 0)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-ToggleButton.BackgroundTransparency = 0.25
-ToggleButton.Text = "Ẩn/Hiện UI"
-ToggleButton.TextColor3 = Color3.new(1,1,1)
-ToggleButton.TextScaled = true
-ToggleButton.Font = Enum.Font.GothamBold
-ToggleButton.Parent = ScreenGui
-ToggleButton.Active = true
-ToggleButton.Draggable = true -- có thể kéo nút đi chỗ khác
-
-ToggleButton.MouseButton1Click:Connect(function()
-    Rayfield:ToggleUI()
-end)
-
--- PHÍM TẮT ẨN HIỆN UI (nếu dùng trên PC)
-local toggleKey = Enum.KeyCode.RightShift
-game:GetService("UserInputService").InputBegan:Connect(function(input, isProcessed)
-    if not isProcessed and input.KeyCode == toggleKey then
-        Rayfield:ToggleUI()
+    -- Nếu giá trị là NumberValue/IntValue, set gần bằng max (theo rate)
+    if stamina.Value < MAX_STAMINA then
+        local add = REFILL_RATE * dt
+        stamina.Value = math.min(MAX_STAMINA, stamina.Value + add)
+    else
+        -- giữ chính xác = MAX_STAMINA (tránh dao động)
+        stamina.Value = MAX_STAMINA
     end
 end)
