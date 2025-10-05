@@ -1,0 +1,113 @@
+-- Tải Rayfield UI
+local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
+
+local autoBlock = false
+local blockRadius = 15 -- phạm vi mặc định, chỉnh qua UI
+local blockKey = Enum.KeyCode.F -- thay đổi nếu phím block khác
+
+-- Khởi tạo UI với tên Cyan Hub
+local Window = Rayfield:CreateWindow({
+    Name = "Cyan Hub", -- Đổi tên UI tại đây
+    LoadingTitle = "Cyan Hub Loading",
+    LoadingSubtitle = "by cyansigma",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = nil,
+        FileName = "CyanHubUI"
+    },
+    Discord = {
+        Enabled = false,
+        Invite = "",
+        RememberJoins = false
+    },
+    KeySystem = false
+})
+
+local MainTab = Window:CreateTab("Auto", 4483362458)
+
+MainTab:CreateToggle({
+    Name = "Auto Block",
+    CurrentValue = false,
+    Flag = "AutoBlock",
+    Callback = function(Value)
+        autoBlock = Value
+    end,
+})
+
+MainTab:CreateSlider({
+    Name = "Phạm vi block (studs)",
+    Range = {5, 50},
+    Increment = 1,
+    Suffix = "studs",
+    CurrentValue = blockRadius,
+    Flag = "BlockRadius",
+    Callback = function(Value)
+        blockRadius = Value
+    end,
+})
+
+-- Hàm kiểm tra killer tấn công trong phạm vi
+function isKillerAttackingInRadius()
+    local localPlayer = game.Players.LocalPlayer
+    if not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then return false end
+    local myPos = localPlayer.Character.HumanoidRootPart.Position
+    for _,v in pairs(game.Players:GetPlayers()) do
+        if v ~= localPlayer and v.Team and v.Team.Name == "Killer" then
+            local char = v.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                if (char.HumanoidRootPart.Position - myPos).Magnitude <= blockRadius then
+                    if char:FindFirstChild("Attack") and char.Attack.Value == true then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+-- Tự động block khi killer đánh trong phạm vi blockRadius
+spawn(function()
+    while task.wait(0.05) do
+        if autoBlock then
+            if isKillerAttackingInRadius() then
+                game:GetService("VirtualInputManager"):SendKeyEvent(true, blockKey, false, game)
+                wait(0.2)
+                game:GetService("VirtualInputManager"):SendKeyEvent(false, blockKey, false, game)
+            end
+        end
+    end
+end)
+
+-- PHẦN NÚT ẨN/HIỆN UI (dành cho mobile)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ToggleRayfieldGui"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game:GetService("CoreGui")
+
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Name = "ToggleButton"
+ToggleButton.Size = UDim2.new(0, 100, 0, 40)
+ToggleButton.Position = UDim2.new(1, -120, 1, -60) -- góc phải, dưới màn hình
+ToggleButton.AnchorPoint = Vector2.new(0, 0)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+ToggleButton.BackgroundTransparency = 0.25
+ToggleButton.Text = "Ẩn/Hiện UI"
+ToggleButton.TextColor3 = Color3.new(1,1,1)
+ToggleButton.TextScaled = true
+ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.Parent = ScreenGui
+ToggleButton.Active = true
+ToggleButton.Draggable = true -- có thể kéo nút đi chỗ khác
+
+ToggleButton.MouseButton1Click:Connect(function()
+    Rayfield:ToggleUI()
+end)
+
+-- PHÍM TẮT ẨN HIỆN UI (nếu dùng trên PC)
+local toggleKey = Enum.KeyCode.RightShift
+game:GetService("UserInputService").InputBegan:Connect(function(input, isProcessed)
+    if not isProcessed and input.KeyCode == toggleKey then
+        Rayfield:ToggleUI()
+    end
+end)
